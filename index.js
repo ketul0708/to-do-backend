@@ -91,6 +91,16 @@ app.put('/todo/edit/:userId', function(req, res) {
   //res.json({success: 'put call succeed!', url: req.url, body: req.body})
 });
 
+app.put('/todo/start/:userId', function(req, res) {
+  startTask(req, res);
+  //res.json({success: 'put call succeed!', url: req.url, body: req.body})
+});
+
+app.put('/todo/end/:userId', function(req, res) {
+  endTask(req, res);
+  //res.json({success: 'put call succeed!', url: req.url, body: req.body})
+});
+
 app.put('/todo/removetasklist/:userId', function(req, res) {
   removeTasklist(req, res);
   //res.json({success: 'put call succeed!', url: req.url, body: req.body})
@@ -233,6 +243,62 @@ async function removeTasklist(req, res){
   }
 }
 
+async function startTask(req, res){
+  try {
+    const userId = req.params.userId;
+
+    await client.connect();
+    const dbo = client.db('to-do');
+    const collection = dbo.collection('userdata');
+    const startTime = req.body.startTime;
+    const task = req.body.task;
+    // Fetch the user's current watchlist
+    const user = await collection.findOne({ userId: userId});
+    if(user!=null){
+      var currentTasklist = user.tasklist || [];
+      if(currentTasklist.length!=0){
+        const index = getIndex(currentTasklist, task);
+        if (index > -1) { // only splice array when item is found
+          currentTasklist[index][6] = startTime;
+        }
+        await collection.updateOne({ userId }, { $set: { tasklist: currentTasklist } });
+        res.json({ success: "Updated watchlist", tasklist: currentTasklist });
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+async function endTask(req, res){
+  try {
+    const userId = req.params.userId;
+
+    await client.connect();
+    const dbo = client.db('to-do');
+    const collection = dbo.collection('userdata');
+    const endTime = req.body.endTime;
+    const task = req.body.task;
+
+    // Fetch the user's current watchlist
+    const user = await collection.findOne({ userId: userId});
+    if(user!=null){
+      var currentTasklist = user.tasklist || [];
+      if(currentTasklist.length!=0){
+        const index = getIndex(currentTasklist, task);
+        if (index > -1) { // only splice array when item is found
+          currentTasklist[index][7] = endTime;
+          currentTasklist[index][5] = "True";
+        }
+        await collection.updateOne({ userId }, { $set: { tasklist: currentTasklist } });
+        res.json({ success: "Updated watchlist", tasklist: currentTasklist });
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 async function editTask(req, res){
   try{
     const userId = req.params.userId;
@@ -284,7 +350,6 @@ function contains(currentTasklist, task){
 }
 
 function getIndex(currentTasklist, toRemove){
-    console.log(toRemove.toString());
   for(let i=0; i<currentTasklist.length; i++){
     if(currentTasklist[i][0].toString() == toRemove[0].toString()){
       return i;
