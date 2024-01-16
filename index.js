@@ -86,6 +86,11 @@ app.put('/todo/tasklist/:userId', function(req, res) {
   //res.json({success: 'put call succeed!', url: req.url, body: req.body})
 });
 
+app.put('/todo/edit/:userId', function(req, res) {
+  editTask(req, res);
+  //res.json({success: 'put call succeed!', url: req.url, body: req.body})
+});
+
 app.put('/todo/removetasklist/:userId', function(req, res) {
   removeTasklist(req, res);
   //res.json({success: 'put call succeed!', url: req.url, body: req.body})
@@ -228,6 +233,31 @@ async function removeTasklist(req, res){
   }
 }
 
+async function editTask(req, res){
+  try{
+    const userId = req.params.userId;
+    await client.connect();
+    const dbo = client.db('to-do');
+    const collection = dbo.collection('userdata');
+    const task = req.body.task;
+    const user = await collection.findOne({ userId: userId});
+    if(user!=null){
+      var currentTasklist = user.tasklist || [];
+      if(currentTasklist.length!=0){
+        const index = getIndex(currentTasklist, task);
+        if (index > -1) { // only splice array when item is found
+          currentTasklist[index] = task;
+        }
+        await collection.updateOne({ userId }, { $set: { tasklist: currentTasklist } });
+        res.json({ success: "Updated watchlist", tasklist: currentTasklist });
+      }
+    }
+  }
+  catch(error){
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 async function changePassword(req, res){
   try {
     await client.connect();
@@ -256,7 +286,7 @@ function contains(currentTasklist, task){
 function getIndex(currentTasklist, toRemove){
     console.log(toRemove.toString());
   for(let i=0; i<currentTasklist.length; i++){
-    if(currentTasklist[i].toString() == toRemove.toString()){
+    if(currentTasklist[i][0].toString() == toRemove[0].toString()){
       return i;
     }
   }
